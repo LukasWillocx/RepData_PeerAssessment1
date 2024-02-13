@@ -4,22 +4,106 @@ output:
   html_document:
     keep_md: true
 ---
-
+## Loading packages
 
 ## Loading and preprocessing the data
 
+```{r}
+activity_data<-read.csv('activity.csv')
+```
 
 
 ## What is mean total number of steps taken per day?
+
+```{r,results='asis',echo=T}
+activity_data_per_day<-tapply(activity_data$steps,activity_data$date,sum)
+
+mean_daily_activity <-mean(activity_data_per_day,na.rm=T)
+median_daily_activity<-median(activity_data_per_day,na.rm=T)
+
+plot(activity_data_per_day,type='h',xlab='Day',ylab='Steps')
+```
+
+The average amount of steps per day is `r format(mean_daily_activity,scientific=F)`, whereas the median amounts to `r format(median_daily_activity,scientific=F)`.
 
 
 
 ## What is the average daily activity pattern?
 
+```{r}
+activity_per_interval<-tapply(activity_data$steps,activity_data$interval,mean,na.rm=T)
+
+max(activity_per_interval,na.rm=T)
+
+plot(unique(activity_data$interval),activity_per_interval,type='l',ylab='steps',xlab='interval')
+
+max_activity<-names(which(max(activity_per_interval)==activity_per_interval))
+```
+The maximal observed activity was in the interval which started at `r max_activity`. 
+
 
 
 ## Imputing missing values
 
+```{r}
+summary_activity<-summary(activity_data) #NAs can be found in the summary, 
 
+#it is apparent that NAs are only present in the 'steps' column of the data
+
+NA_count<-sum(is.na(activity_data))
+```
+The total number of NA values is `r NA_count``
+
+```{r}
+#swapping the NA values for the mean of that given interval
+
+mean_activity_vector<-rep(activity_per_interval ,61) 
+#repilcates the mean interval steps for every day/observation
+#the mean interval value will be picked form this vector, 
+#to replace the NA (both are the same length, for-loop convenience)
+
+no_NA_activity_data<-activity_data #create new cleaned data 
+
+for (i in 1:dim(no_NA_activity_data)[1]){
+  if(is.na(no_NA_activity_data$steps[i])){
+    no_NA_activity_data$steps[i]<-mean_activity_vector[i]
+  }
+}
+```
+
+```{r,message=F}
+no_NA_activity_data_per_day<-tapply(no_NA_activity_data$steps,no_NA_activity_data$date,sum)
+no_NA_mean_daily_activity <-mean(no_NA_activity_data_per_day,na.rm=T)
+
+rbind(plot(activity_data_per_day,type='h',xlab='Day',ylab='Steps',main='with missing values'),
+plot(no_NA_activity_data_per_day,type='h',xlab='Day',ylab='Steps',main='without missing values'))
+```
+
+Given the NA values were only present for a given entire day, the days with data remain unaffected, whereas the days where no data was available, are now represented by a histogram bar that reflects the 60 day average. 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+no_NA_activity_data$Weekdays<-weekdays(as.Date(activity_data$date))
+
+weekdays<-unique(no_NA_activity_data$Weekdays)[1:5]
+weekenddays<-unique(no_NA_activity_data$Weekdays)[6:7] 
+#can be excluded, non weekdays are weekenddays by default
+
+no_NA_activity_data$weekfactor<-as.factor(no_NA_activity_data$Weekdays%in% weekdays)
+levels(no_NA_activity_data$weekfactor)<-c('weekend','weekday') #beware of level order!
+```
+
+```{r}
+#splitting the data_set in two, for weekdays and weekends
+
+activity_data_split<-split(no_NA_activity_data,no_NA_activity_data$weekfactor)
+
+weekday_activity<-tapply(activity_data_split$weekday$steps,activity_data_split$weekday$interval,mean)
+
+weekend_activity<-tapply(activity_data_split$weekend$steps,activity_data_split$weekend$interval,mean)
+
+rbind(plot(unique(names(weekday_activity)),weekday_activity,type='l',xlab='interval',ylab='steps',main='weekday activity'),
+      plot(unique(names(weekend_activity)),weekend_activity,type='l',xlab='interval',ylab='steps',main='weekend activity'))
+```
+
